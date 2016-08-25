@@ -25,6 +25,27 @@ def importMatplotlib():
         return False
 
 
+def zscale(input_img, contrast=0.25):
+    """This emulates ds9's zscale feature. Returns the suggested minimum and
+    maximum values to display. Borrowed from ctslater."""
+
+    samples = input_img.flatten()
+    samples = samples[~np.isnan(samples)]
+    samples.sort()
+    chop_size = int(0.10*len(samples))
+    subset = samples[chop_size:-chop_size]
+
+    i_midpoint = int(len(subset)/2)
+    I_mid = subset[i_midpoint]
+
+    fit = np.polyfit(np.arange(len(subset)) - i_midpoint, subset, 1)
+    # fit = [ slope, intercept]
+
+    z1 = I_mid + fit[0]/contrast * (1-i_midpoint)/1.0
+    z2 = I_mid + fit[0]/contrast * (len(subset)-i_midpoint)/1.0
+    return z1, z2
+
+
 def display2dArray(arr, title='Data', showBars=True, extent=None):
     """Use matplotlib.pyplot.imshow() to display a 2-D array.
 
@@ -39,8 +60,9 @@ def display2dArray(arr, title='Data', showBars=True, extent=None):
     if not plt:
         return
 
+    z1, z2 = zscale(arr)
     fig = plt.imshow(arr, origin='lower', interpolation='none', cmap='gray',
-                     extent=extent)
+                     extent=extent, vmin=z1, vmax=z2)
     plt.title(title)
     if showBars:
         plt.colorbar(fig, cmap='gray')
@@ -146,7 +168,8 @@ def displayExposure(exposure, showMasks=True, showVariance=False, showPsf=False,
     return fig
 
 
-def displayCutouts(source, exposure, posImage=None, negImage=None, asHeavyFootprint=False, title=''):
+def displayCutouts(source, exposure, posImage=None, negImage=None, asHeavyFootprint=False, title='',
+                   figsize=(8, 2.5)):
     """Use matplotlib.pyplot.imshow() to display cutouts within up to
     three afw.image.Exposure's, given by an input SourceRecord.
 
@@ -169,7 +192,7 @@ def displayCutouts(source, exposure, posImage=None, negImage=None, asHeavyFootpr
     bbox = fp.getBBox()
     extent = (bbox.getBeginX(), bbox.getEndX(), bbox.getBeginY(), bbox.getEndY())
 
-    fig = plt.figure(figsize=(8, 2.5))
+    fig = plt.figure(figsize=figsize)
     if not asHeavyFootprint:
         subexp = afwImage.ImageF(exposure.getMaskedImage().getImage(), bbox, afwImage.PARENT)
     else:
